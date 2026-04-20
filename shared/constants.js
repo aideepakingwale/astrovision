@@ -1,8 +1,26 @@
 // shared/constants.js  — consumed by both backend & frontend
 
 const MODELS = {
-  SONNET : 'claude-sonnet-4-20250514',   // Vision + deep reasoning
-  HAIKU  : 'claude-haiku-4-5-20251001',  // Fast, lightweight
+  // Free AI providers — zero cost
+  GEMINI_FLASH : 'gemini-1.5-flash',          // Google — vision + text (palm reading)
+  GROQ_70B     : 'llama-3.3-70b-versatile',   // Groq   — complex reasoning (kundali)
+  GROQ_8B      : 'llama-3.1-8b-instant',      // Groq   — fast lightweight (transits, remedies)
+  OPENROUTER   : 'meta-llama/llama-3.1-8b-instruct:free', // OpenRouter — fallback only
+};
+
+const PROVIDERS = {
+  GEMINI     : 'gemini',
+  GROQ_70B   : 'groq_70b',
+  GROQ_8B    : 'groq_8b',
+  OPENROUTER : 'openrouter',
+};
+
+// Daily request limits per provider (free tier)
+const PROVIDER_LIMITS = {
+  gemini     : 1500,   // 1,500 req/day  — Google AI Studio free tier
+  groq_70b   : 14400,  // 14,400 req/day — Groq free tier
+  groq_8b    : 14400,  // 14,400 req/day — Groq free tier
+  openrouter : 200,    // ~200 req/day   — OpenRouter free models
 };
 
 const FEATURES = {
@@ -66,21 +84,21 @@ const ERROR_CODES = {
   REPORT_NOT_FOUND     : 'REPORT_NOT_FOUND',
   INSUFFICIENT_CREDITS : 'INSUFFICIENT_CREDITS',
   AI_ERROR             : 'AI_ERROR',
+  AI_LIMIT_REACHED     : 'AI_LIMIT_REACHED',
   VALIDATION_ERROR     : 'VALIDATION_ERROR',
 };
 
-// Works in both Node.js (CommonJS) and browser/bundled contexts
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    MODELS, FEATURES, REPORT_TYPES, PLANS,
-    ZODIAC, NAKSHATRAS, PLANET_SYMBOLS, DASHA_ORDER,
-    HTTP_STATUS, ERROR_CODES,
+    MODELS, PROVIDERS, PROVIDER_LIMITS, FEATURES,
+    REPORT_TYPES, PLANS, ZODIAC, NAKSHATRAS,
+    PLANET_SYMBOLS, DASHA_ORDER, HTTP_STATUS, ERROR_CODES,
   };
 } else {
   // ESM export (frontend bundler)
   Object.assign(window.__AV_CONSTANTS__ = window.__AV_CONSTANTS__ || {}, {
-    MODELS, FEATURES, REPORT_TYPES, PLANS,
-    ZODIAC, NAKSHATRAS, PLANET_SYMBOLS, DASHA_ORDER,
-    HTTP_STATUS, ERROR_CODES,
+    MODELS, PROVIDERS, PROVIDER_LIMITS, FEATURES,
+    REPORT_TYPES, PLANS, ZODIAC, NAKSHATRAS,
+    PLANET_SYMBOLS, DASHA_ORDER, HTTP_STATUS, ERROR_CODES,
   });
 }

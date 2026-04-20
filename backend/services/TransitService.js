@@ -1,7 +1,8 @@
 // backend/services/TransitService.js
-// ─── Daily transit & quick remedy (claude-haiku, fast reads) ─────────────────
+// ─── Daily transit & remedy advisor — uses Groq Llama 3.1 8B (free, fast) ───
+// Both results are cached in SQLite so AI is called at most once per sign/day.
 
-const { withHaiku }       = require('./AIService');
+const { callTextAI }      = require('./AIService');
 const { getDb }           = require('../config/database');
 const { FEATURES, MODELS }= require('../../shared/constants');
 const crypto              = require('crypto');
@@ -30,12 +31,8 @@ async function getDailyTransit({ moonSign = 'Taurus', userId = null }) {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  const result = await withHaiku({
-    feature  : FEATURES.TRANSIT,
-    system   : 'You are a Vedic astrologer. Return ONLY valid JSON — no markdown, no prose outside the JSON.',
-    messages : [{
-      role   : 'user',
-      content: `Today is ${todayFull}. Moon sign: ${normalised}.
+  const { provider, model, data: result } = await callTextAI({
+    prompt       : `Today is ${todayFull}. Moon sign: ${normalised}.
 Write an inspiring, accurate daily cosmic reading.
 Return JSON:
 {
@@ -48,16 +45,18 @@ Return JSON:
   "avoid":          "One concise thing to avoid today",
   "best_time":      "Best time window for important actions today"
 }`,
-    }],
-    maxTokens: 400,
+    systemPrompt : 'You are a Vedic astrologer. Return ONLY valid JSON — no markdown, no prose outside the JSON.',
+    preferSpeed  : true,   // Groq 8B is fast and sufficient for daily transit
+    feature      : FEATURES.TRANSIT,
+    maxTokens    : 400,
     userId,
   });
 
-  // Persist to cache
+  // Persist to cache — model_used records which provider actually served this
   db.prepare(`
     INSERT OR REPLACE INTO daily_transits (transit_date, moon_sign, model_used, transit_data)
     VALUES (?, ?, ?, ?)
-  `).run(today, normalised, MODELS.HAIKU, JSON.stringify(result));
+  `).run(today, normalised, `${provider}/${model}`, JSON.stringify(result));
 
   return result;
 }
@@ -81,12 +80,8 @@ async function getRemedies({ lagna = 'Scorpio', issues = [], userId = null }) {
 
   if (cached) return JSON.parse(cached.remedy_data);
 
-  const result = await withHaiku({
-    feature  : FEATURES.REMEDY,
-    system   : 'You are a Vedic remedy specialist (jyotish upaya). Return ONLY valid JSON.',
-    messages : [{
-      role   : 'user',
-      content: `Lagna: ${lagna}. Life challenges: ${issueList}.
+  const { provider, model, data: result } = await callTextAI({
+    prompt       : `Lagna: ${lagna}. Life challenges: ${issueList}.
 Provide 3 highly specific, actionable Vedic remedies.
 Return JSON:
 {
@@ -99,8 +94,10 @@ Return JSON:
   "gemstone":  "Specific gemstone recommendation with finger and metal",
   "yantra":    "Relevant yantra with brief use instruction"
 }`,
-    }],
-    maxTokens: 600,
+    systemPrompt : 'You are a Vedic remedy specialist (jyotish upaya). Return ONLY valid JSON.',
+    preferSpeed  : true,   // Groq 8B is sufficient for remedies
+    feature      : FEATURES.REMEDY,
+    maxTokens    : 600,
     userId,
   });
 
@@ -108,7 +105,7 @@ Return JSON:
   db.prepare(`
     INSERT OR REPLACE INTO remedies (lagna, issues_hash, issues, model_used, remedy_data)
     VALUES (?, ?, ?, ?, ?)
-  `).run(lagna, issuesHash, JSON.stringify(sortedIssues), MODELS.HAIKU, JSON.stringify(result));
+  `).run(lagna, issuesHash, JSON.stringify(sortedIssues), `${provider}/${model}`, JSON.stringify(result));
 
   return result;
 }

@@ -1,8 +1,8 @@
 // backend/services/KundaliService.js
-// ─── Kundali / Birth Chart generation (claude-sonnet, complex reasoning) ─────
+// ─── Kundali / Birth Chart generation — uses Groq Llama 3.3 70B (free) ──────
 
-const { withSonnet }        = require('./AIService');
-const { FEATURES }          = require('../../shared/constants');
+const { callTextAI } = require('./AIService');
+const { FEATURES }   = require('../../shared/constants');
 
 const SYSTEM_PROMPT = `You are Pandit Vikram Sharma, a Jyotish Acharya with 35 years of practice in Parashari and Jaimini astrology. You specialise in precise Lagna chart construction, accurate Vimshottari Dasha calculations, and detailed life-domain predictions. Your readings are scholarly yet accessible.
 
@@ -23,13 +23,16 @@ CRITICAL: Return ONLY valid, parseable JSON — no markdown, no prose outside th
 async function generateKundali({ name, dob, tob, pob, latitude, longitude, userId = null }) {
   const prompt = buildKundaliPrompt({ name, dob, tob, pob, latitude, longitude });
 
-  return withSonnet({
-    feature  : FEATURES.KUNDALI,
-    system   : SYSTEM_PROMPT,
-    messages : [{ role: 'user', content: prompt }],
-    maxTokens: 3200,
+  const { provider, model, data } = await callTextAI({
+    prompt,
+    systemPrompt : SYSTEM_PROMPT,
+    preferSpeed  : false,   // use Groq 70B for highest quality on kundali
+    feature      : FEATURES.KUNDALI,
+    maxTokens    : 3200,
     userId,
   });
+
+  return { ...data, _ai_provider: provider, _ai_model: model };
 }
 
 function buildKundaliPrompt({ name, dob, tob, pob, latitude, longitude }) {

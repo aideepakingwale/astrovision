@@ -1,8 +1,8 @@
 // backend/services/PalmService.js
-// ─── Palm Reading AI analysis (uses claude-sonnet with vision) ───────────────
+// ─── Palm Reading — uses Gemini 1.5 Flash (vision) via free AI waterfall ─────
 
-const { withSonnet, imageBlock } = require('./AIService');
-const { MODELS, FEATURES }       = require('../../shared/constants');
+const { callVisionAI } = require('./AIService');
+const { FEATURES }     = require('../../shared/constants');
 
 const SYSTEM_PROMPT = `You are Guruji Anand, a 40-year master of Vedic palmistry trained in the Jaipur gurukul tradition. You read palms with clinical precision, spiritual depth, and compassionate insight. You integrate both Western chirology and Vedic hasta-samudrika-shastra.
 
@@ -17,22 +17,17 @@ CRITICAL: Return ONLY valid, parseable JSON — no markdown fences, no explanato
  * @returns {Promise<object>}
  */
 async function analyzePalm({ imageBase64, mimeType = 'image/jpeg', userId = null }) {
-  const hasImage = Boolean(imageBase64);
-
-  const userContent = hasImage
-    ? [
-        imageBlock(imageBase64, mimeType),
-        { type: 'text', text: buildPalmPrompt(true) },
-      ]
-    : [{ type: 'text', text: buildPalmPrompt(false) }];
-
-  return withSonnet({
-    feature  : FEATURES.PALM,
-    system   : SYSTEM_PROMPT,
-    messages : [{ role: 'user', content: userContent }],
-    maxTokens: 2000,
+  const { provider, model, data } = await callVisionAI({
+    prompt      : buildPalmPrompt(Boolean(imageBase64)),
+    systemPrompt: SYSTEM_PROMPT,
+    imageBase64,
+    mimeType,
+    feature     : FEATURES.PALM,
+    maxTokens   : 2000,
     userId,
   });
+
+  return { ...data, _ai_provider: provider, _ai_model: model };
 }
 
 function buildPalmPrompt(hasImage) {

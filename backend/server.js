@@ -47,16 +47,37 @@ app.use(rateLimit({
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', routes);
 
+// ── Health endpoint — shows AI provider usage (for UptimeRobot + monitoring) ─
+app.get('/health', async (req, res) => {
+  try {
+    const { getSummary } = require('./services/RateLimitTracker');
+    const providers = await getSummary();
+    res.json({
+      status    : 'ok',
+      version   : '2.0.0',
+      ai_stack  : 'gemini-flash + groq-llama + openrouter (zero cost)',
+      db        : process.env.TURSO_DATABASE_URL ? 'turso-libsql' : 'sqlite-local',
+      providers,
+      timestamp : new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ status: 'error', message: e.message });
+  }
+});
+
 // ── Error handling ────────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n╔══════════════════════════════════════╗`);
-  console.log(`║  AstroVision API  ·  Port ${PORT}        ║`);
-  console.log(`║  ENV: ${(process.env.NODE_ENV || 'development').padEnd(28)}║`);
-  console.log(`╚══════════════════════════════════════╝\n`);
+  const db = process.env.TURSO_DATABASE_URL ? 'Turso LibSQL (cloud)' : 'SQLite (local)';
+  console.log(`\n╔══════════════════════════════════════════════╗`);
+  console.log(`║  AstroVision API v2.0  ·  Port ${PORT}           ║`);
+  console.log(`║  AI:  Gemini Flash + Groq + OpenRouter       ║`);
+  console.log(`║  DB:  ${db.padEnd(38)}║`);
+  console.log(`║  Cost: $0.00 / month (zero-cost stack)       ║`);
+  console.log(`╚══════════════════════════════════════════════╝\n`);
 });
 
 module.exports = app;
